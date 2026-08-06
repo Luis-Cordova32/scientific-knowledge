@@ -1,0 +1,27 @@
+# Scientific Knowledge Skill Configuration
+# ==========================================
+# Edit this file to configure paths for your environment.
+
+# Base folder where papers, PDFs, markdown files, and database are stored.
+# Environment variables (e.g. $OneDriveConsumer, $HOME, or a custom one you define) are
+# expanded at runtime via os.path.expandvars(). Use forward slashes even on Windows.
+#
+# This file is tracked in git and shared across machines -- never hardcode a
+# machine-specific absolute path here. Point it at an env var instead and set that
+# var's value once per machine (it can point anywhere, including a standalone git repo).
+# Examples:
+#   "$OneDriveConsumer/doctorado/papers/agent"   (OneDrive-synced folder)
+#   "$HOME/papers/agent"                          (Linux/macOS)
+#   "$PAPERS_DB"                                  (custom env var, set per machine)
+papers_folder: "$PAPERS_DB"
+
+# ArXiv API base URL (no need to change unless ArXiv moves)
+arxiv_api_url: "http://export.arxiv.org/api/query"
+
+# Default topic folder for summaries when none is specified. Topics are created
+# automatically on first use -- list `<papers_folder>/database/` to see the topics that
+# already exist on this machine before picking one; don't assume any specific set.
+default_topic: "general"
+
+# PDF to markdown conversion engine: "markitdown" or "pypdf"
+pdf_engine: "markitdown"

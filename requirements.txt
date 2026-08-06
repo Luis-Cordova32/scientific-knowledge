@@ -1,0 +1,5 @@
+docopt
+pyyaml
+requests
+markitdown
+pypdf
