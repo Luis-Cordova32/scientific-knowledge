@@ -51,12 +51,36 @@ Always use the full path when running commands — **do not** run them relative 
 
 If the script is not found at this path, **stop and ask the user** where the `scientific-knowledge` skill folder is located before proceeding.
 
+## Before First Use On A Machine: verify, do not assume
+
+`papers_folder` in `config.yaml` points at an **environment variable** so the file
+stays machine-agnostic in git. That variable must be set per machine. If it is
+not, every lookup silently misses.
+
+Run this once at the start of any session that touches the database:
+
+```
+python ~/.claude/skills/scientific-knowledge/scripts/arxiv_download.py search "sparse"
+```
+
+- A **normal JSON result with count > 0** means the database is reachable.
+- **`Error: papers_folder is '$VAR' -- ... NOT SET`** (exit 2) means the env var
+  is missing. Fix with `setx PAPERS_DB "<path>"` (Windows; opens in NEW shells
+  only) or `export PAPERS_DB=...`, then retry.
+- **`ModuleNotFoundError`** means you are using the wrong interpreter -- see below.
+
+**Use the project's virtualenv interpreter, not bare `python`.** The skill's
+dependencies (`requests`, `markitdown`, `pypdf`) are commonly installed only in a
+project venv. On Deep Brain: `.venv/Scripts/python.exe`. A bare `python` may lack
+`requests` and die at import.
+
 ## Command Execution Rules
 
 - **Always run commands with `isBackground=false`** (foreground). These scripts finish in seconds, so foreground capture is always reliable — unlike long-running SAE training scripts which may need background.
 - **Errors in the output ARE the output** — if the script prints a 429 rate limit error or any other error message, that is a real result, not a capture failure. Do not switch to background mode, temp files, or `2>&1` redirects in response to a script error.
-- **Run commands directly** — never redirect output to a temp file (`> /tmp/...`) or chain with `cat`. The scripts write JSON to stdout; read it directly from the terminal output.
-- **Do not use `2>&1` redirects** — stderr is progress/debug info and should remain separate.
+- **Run commands directly** — never redirect output to a temp file (`> /tmp/...`), chain with `cat`, or **pipe the JSON into another parser** (`| python -c ...`, `| jq`). Read the JSON directly from the terminal output. A parser in the pipeline swallows tracebacks and turns a crash into what looks like an empty result.
+- **Never suppress stderr** (`2>/dev/null`) and do not use `2>&1` redirects. Errors ARE the output; a hidden `ModuleNotFoundError` or config error is indistinguishable from "no matches" once stderr is discarded. This is exactly how a paper that WAS in the database got reported as absent.
+- **`count: 0` is a claim that needs corroboration, not a conclusion.** Before telling the user a paper is absent, confirm the database is reachable (a control search that SHOULD hit, e.g. `search "sparse"`), and try the tag, the title, and the first author separately.
 - **Rate limit (429):** wait 10–15 seconds, then retry the same foreground command once. If it fails again, report the error to the user and stop.
 
 ## Workflow: Download and Process a Paper
@@ -95,6 +119,10 @@ Given an ArXiv URL or ID (e.g., `https://arxiv.org/abs/2301.12345` or `2301.1234
    in a VS Code / Copilot host the equivalent is `vscode/askQuestions`):
    - **Tag question** (`header: "Tag"`): options = `tag_options`, first one labelled
      "(Recommended)". "Other" already covers a custom tag — do not add one.
+     Prefer a tag that includes the **first author's surname** or a **distinctive title
+     token** over a generic descriptive phrase (e.g. `karvonen-sae-boardgames`, not
+     `sae-evaluation-metrics`) — an opaque tag is hard to find later even when
+     `search` works correctly.
    - **Topic question** (`header: "Topic"`): put `suggested_topic` first, labelled
      "(Recommended)", then the closest entries from `existing_topics`. `AskUserQuestion`
      allows **at most 4 options per question**, so pick the 3 closest existing topics
@@ -177,7 +205,12 @@ re-run with `existing_tag` to refresh it rather than inventing a new tag.
   python scripts/arxiv_download.py search "<pattern>" [--field tag|title|author|topic|abstract]
   ```
   Omit `--field` to search all fields. `<pattern>` is a case-insensitive regex. Output is JSON with matching papers (tag, title, authors, topic, arxiv_id, abstract).
-- **Find papers by topic**: List folders under `<papers_folder>/database/`, or `search "<topic>" --field topic`
+- **Find papers by topic**: List folders under `<papers_folder>/database/`, or `search "<topic>" --field topic`.
+  ⚠️ **A paper's `topic` is where it is FILED, not what it is about.** The canonical
+  board-game SAE paper (Karvonen et al., *Measuring Progress in Dictionary Learning
+  ... with Board Game Models*) is filed under `sparse-autoencoders`, not `board-games`.
+  **Never conclude a paper is absent from browsing one topic folder** — always use
+  `search` across all fields, and try title words, the tag, and the author surname.
 - **Read a summary**: Read `<papers_folder>/database/<topic>/<tag>_summary.md`
 - **Read the full paper**: Read `<papers_folder>/md/<tag>.md`
 - **Get references**: Read `<papers_folder>/references.bib` (one entry per ingested paper)

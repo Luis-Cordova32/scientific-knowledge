@@ -118,6 +118,37 @@ def load_config(config_path: str | Path) -> dict[str, Any]:
     for key, value in config.items():
         if isinstance(value, str):
             config[key] = os.path.expandvars(value)
+
+    # FAIL LOUDLY on a misconfigured papers_folder. Without this the whole tool
+    # degrades silently: an unset env var leaves the literal "$PAPERS_DB" as the
+    # path, every lookup misses, and `search` reports {"count": 0} -- which is
+    # indistinguishable from "the database genuinely has no match". That is how a
+    # paper that WAS in the database got reported as absent.
+    folder = config.get("papers_folder", "")
+    unexpanded = re.findall(r"\$\w+|\$\{\w+\}", folder)
+    if unexpanded:
+        print(
+            f"Error: papers_folder is '{folder}' -- the environment variable(s) "
+            f"{', '.join(unexpanded)} are NOT SET on this machine.\n"
+            f"  Set it once, e.g.:  setx PAPERS_DB \"E:/path/to/your/papers-db\"\n"
+            f"  (open a new shell afterwards), or edit {config_path}.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if not Path(folder).is_dir():
+        print(
+            f"Error: papers_folder does not exist: {folder}\n"
+            f"  Fix the path in {config_path} or the env var it points at.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    abstracts = Path(folder) / "database" / "abstracts.json"
+    if not abstracts.is_file():
+        print(
+            f"Warning: no database/abstracts.json under {folder}. "
+            f"Searches will return nothing until a paper is ingested.",
+            file=sys.stderr,
+        )
     return config
 
 
