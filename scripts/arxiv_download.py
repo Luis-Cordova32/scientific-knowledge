@@ -33,6 +33,8 @@ Options:
     --field <field>     Field to search: tag, title, author, abstract, topic, or all [default: all]
 """
 
+from __future__ import annotations
+
 """
 Python 3
 06 / 08 / 2026
@@ -44,7 +46,6 @@ Python 3
 "Either mathematics is too big for the human mind or the human mind is more than a machine."
 -Kurt Godël
 """
-from __future__ import annotations
 
 import json
 import os
